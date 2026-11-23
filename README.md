@@ -5,25 +5,29 @@
 - [Vercel Writing Guidelines](https://github.com/vercel-labs/writing-guidelines)（prose 规则：语气、结构、数字、单位、标点、AI 腔）
 - OpenDesign `craft/typography.md` + `typography-hierarchy(.editorial)`（排印规则：字号阶梯、CJK 行高、字距、行长、表格、分页）
 
-两套规则原本是给英文开发者文档和网页设计用的。这个技能把它们重写成**中文企业文件可用**的版本，加了两件事：
+两套规则原本是给英文开发者文档和网页设计用的。这个技能把它们重写成**中文企业文件可用**的版本，加了三件事：
 
-1. **自动审计**：`scripts/audit_docx.py` 读一份 .docx，输出 `文件:位置 编号 问题 → 改法`，严重项 > 0 时退出码 1。
-2. **一键重排**：`scripts/restyle_docx.py` 按预设（`board` / `whitepaper` / `memo`）改样式层——字体、字号、固定行距、段距、对齐、表格线、页码。不改一个字。
+1. **自动审计（Word）**：`scripts/audit_docx.py` 读一份 .docx，输出 `文件:位置 编号 问题 → 改法`，严重项 > 0 时退出码 1。
+2. **自动审计（Excel）**：`scripts/audit_xlsx.py` 查网格线、数字格式、列宽截断、数字列夹文字、比率存成小数、冻结与打印设置 —— 企业报表的四个常见死因。
+3. **一键重排**：`scripts/restyle_docx.py` 按预设（`board` / `whitepaper` / `memo`）改样式层——字体、字号、固定行距、段距、对齐、表格线、页码。不改一个字。
 
 ## 一分钟上手
 
 ```bash
-# 审计（人读）
+# Word 审计（人读）
 python scripts/audit_docx.py 年报.docx
 
-# 审计（给 agent 迭代用）
+# Word 审计（给 agent 迭代用）
 python scripts/audit_docx.py 年报.docx --json
+
+# Excel 审计
+python scripts/audit_xlsx.py 报表.xlsx
 
 # 按董事会版式重排（另存 年报-排版版.docx）
 python scripts/restyle_docx.py 年报.docx --style board
 ```
 
-依赖：`python-docx`、`lxml`（`pip install python-docx`）。
+依赖：`python-docx`、`openpyxl`、`lxml`（`pip install python-docx openpyxl`）。
 
 ## 输出长什么样
 
@@ -48,6 +52,13 @@ python scripts/restyle_docx.py 年报.docx --style board
 
 重排只管样式层，所以剩下的必然是要动笔改的那些——这个分工是刻意的。
 
+Excel 同理（同一份财务报表，两种排法）：
+
+| | 未排印 | 精排 |
+|---|---|---|
+| 严重项 | **8** | **0** |
+| 命中的问题 | X1 网格线、X2 General 格式、X3 数字左对齐、X4 列宽截断、X8 全网格边框、X9 表头无区分、X11 无打印设置 + 文字类 W4/W8 | — |
+
 ## 内容
 
 ```
@@ -57,12 +68,14 @@ references/
   typography.md              排印规范（含中文覆盖、编辑级排版）
   house-styles.md            三套版式（board / whitepaper / memo）的具体 pt 值
   office-params.md           Word / Excel / PPT / PDF 各自的落地参数与坑
-  checklist.md               检查矩阵（编号 ↔ 判定 ↔ 严重度）
+  checklist.md               检查矩阵（W / T / X 三组编号）
 scripts/
   audit_docx.py              审计 .docx / .md / .txt
+  audit_xlsx.py              审计 .xlsx / .xlsm
+  text_rules.py              书写规则共用实现（两个审计器都走它）
   restyle_docx.py            按预设重排 .docx 样式层
 install/DEFAULT-INVOKE.md    让各 agent 默认调用
-evals/evals.json             自测用例
+evals/                       fixture 生成器 + 回归测试
 ```
 
 ## 一句话装进 agent（WorkBuddy / 豆包 / 任何能跑命令的助手）
@@ -115,6 +128,8 @@ cp -r enterprise-doc-format ~/.agents/skills/
 见 `install/DEFAULT-INVOKE.md`——里面有四种形态的现成句子（AGENTS.md、WorkBuddy 默认技能、豆包智能体提示词、Cursor rules）。
 
 ## 版本
+
+`1.1.0` — 新增 Excel 审计（`audit_xlsx.py`，X1–X15），书写规则抽成 `text_rules.py` 供两个审计器共用；evals 增加 xlsx fixture。
 
 `1.0.0` — 首次发布。规则来源锁定：writing-guidelines `83e2316`；OpenDesign craft 规则库同期快照。
 

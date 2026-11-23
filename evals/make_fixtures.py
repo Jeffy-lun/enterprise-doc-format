@@ -211,8 +211,100 @@ def make_good(path):
     doc.save(path)
 
 
+def make_bad_xlsx(path):
+    """Excel 的典型样子：网格线开着、General 格式、数字左对齐、列宽截断、
+    表头不加粗、没冻结没打印区、同列数字文字混排。"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, Side
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "利润表"
+    ws["A1"] = "恒启精密制造股份有限公司 2025 年年度财务数据（未经审计，单位：万元）"
+
+    data = [("项目", "2025年", "2024年", "变动"),
+            ("营业收入（亿元）", 48.62, 43.25, 0.124),
+            ("毛利率", 0.316, 0.302, 0.014),
+            ("归母净利润（亿元）", 5.31, 4.88, 0.087),
+            ("资产负债率", 0.384, 0.410, -0.026)]
+    for ri, row in enumerate(data, start=3):
+        for ci, val in enumerate(row, start=1):
+            c = ws.cell(ri, ci, val)
+            c.alignment = Alignment(horizontal="left")
+            c.border = Border(*(Side(style="thin"),) * 4)
+            c.font = Font(name="宋体", size=11)
+    ws.column_dimensions["A"].width = 8.43
+    ws.cell(6, 3, "见附注")          # 数字列中间夹一个文字 → X12
+    ws.cell(9, 1, "备注：营业收入48.62亿元，同比增12.4%")
+    ws.cell(10, 1, "这是今年唯一值得写进报告的自救动作")
+    wb.save(path)
+
+
+def make_good_xlsx(path):
+    """按 references/typography.md 第 10 节排的报表：关网格线、数字右对齐带格式、
+    只有表头细线 + 表尾粗线、冻结、打印区、单位声明。"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.worksheet.properties import PageSetupProperties
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "利润表"
+    ws.sheet_view.showGridLines = False
+    ws.column_dimensions["A"].width = 3
+    ws.column_dimensions["B"].width = 30
+    for col in "CDE":
+        ws.column_dimensions[col].width = 16
+
+    def put(r, c, v, *, size=10.5, bold=False, color="111111", fmt=None,
+            align="left"):
+        cell = ws.cell(r, c, v)
+        cell.font = Font(name="Segoe UI", size=size, bold=bold, color=color)
+        cell.alignment = Alignment(horizontal=align, vertical="center")
+        if fmt:
+            cell.number_format = fmt
+        return cell
+
+    put(2, 2, "恒启精密制造股份有限公司", size=9, bold=True, color="555555")
+    put(3, 2, "利润表｜2025 年年度财务数据", size=18, bold=True)
+    put(4, 2, "报告期 2025-01-01 至 2025-12-31　金额单位：人民币万元", size=9,
+        color="555555")
+
+    head = ("项目", "2025 年", "2024 年", "变动")
+    for i, h in enumerate(head, start=2):
+        cell = put(6, i, h, size=9, bold=True, color="555555",
+                   align="left" if i == 2 else "right")
+        cell.border = Border(bottom=Side(style="thin", color="111111"))
+
+    rows = [("营业收入（亿元）", 48.62, 43.25, 0.124, "#,##0"),
+            ("毛利率", 0.316, 0.302, 0.014, "0.0%"),
+            ("归母净利润（亿元）", 5.31, 4.88, 0.087, "#,##0"),
+            ("资产负债率", 0.384, 0.410, -0.026, "0.0%")]
+    for ri, (label, a, b, yoy, fmt) in enumerate(rows, start=7):
+        ws.row_dimensions[ri].height = 21
+        put(ri, 2, label)
+        put(ri, 3, a, fmt=fmt, align="right")
+        put(ri, 4, b, fmt=fmt, align="right")
+        put(ri, 5, round(yoy * 100, 1) if fmt in ("0.0%",) else yoy,
+            fmt='+0.0" pt"' if fmt == "0.0%" else "+0.0%;-0.0%", align="right")
+        last = ri == 6 + len(rows)
+        for ci in range(2, 6):
+            ws.cell(ri, ci).border = Border(
+                bottom=Side(style="medium" if last else "hair", color="111111"))
+
+    put(12, 2, "注：数据未经审计，以年度报告全文为准。", size=9, color="555555")
+    ws.freeze_panes = "C7"
+    ws.print_area = "A1:E12"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    wb.save(path)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     make_bad(os.path.join(OUT, "bad.docx"))
     make_good(os.path.join(OUT, "good.docx"))
+    make_bad_xlsx(os.path.join(OUT, "bad.xlsx"))
+    make_good_xlsx(os.path.join(OUT, "good.xlsx"))
     print("fixtures:", OUT)

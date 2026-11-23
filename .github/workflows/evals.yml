@@ -20,20 +20,26 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install deps
-        run: python -m pip install --upgrade pip python-docx lxml
+        run: python -m pip install --upgrade pip python-docx openpyxl lxml
 
       - name: Build fixtures
         run: python evals/make_fixtures.py
 
-      - name: Regression (audit + restyle)
+      - name: Regression (audit + restyle, docx & xlsx)
         run: python evals/run_evals.py
 
-      - name: Audit a compliant fixture (must exit 0)
-        run: python scripts/audit_docx.py evals/fixtures/good.docx
+      - name: Audit compliant fixtures (must exit 0)
+        run: |
+          python scripts/audit_docx.py evals/fixtures/good.docx
+          python scripts/audit_xlsx.py evals/fixtures/good.xlsx
 
-      - name: Audit a broken fixture (must exit 1)
+      - name: Audit broken fixtures (must exit 1)
         run: |
           if python scripts/audit_docx.py evals/fixtures/bad.docx; then
             echo "expected non-zero exit for bad.docx"
+            exit 1
+          fi
+          if python scripts/audit_xlsx.py evals/fixtures/bad.xlsx; then
+            echo "expected non-zero exit for bad.xlsx"
             exit 1
           fi

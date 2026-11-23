@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""企业文档审计：书写规范（W）+ 排印规范（T）。
+"""企业文档审计：书写规范（W）+ 排印规范（T）。书写规则共用 text_rules.py。
 
 用法：
     python audit_docx.py 报告.docx
     python audit_docx.py 报告.docx --json
     python audit_docx.py notes.md            # 纯文本只跑书写规则
-    python audit_docx.py 报告.docx --max 200 # 每类最多报多少条
+    python audit_docx.py 报告.docx --max 200 # 最多报多少条
 
 输出：`文件:位置 编号 问题 → 改法`，末尾一行统计。严重项 > 0 时退出码 1。
 """
@@ -15,43 +15,15 @@ import json
 import re
 import sys
 
-CJK = re.compile(r"[\u4e00-\u9fff]")
-NUM = re.compile(r"^[+\-−]?\s*[\d,]+(\.\d+)?\s*%?$")
-UNIT_GLUE = re.compile(
-    r"\d(亿元|万元|万台|万套|万个|万人|万吨|个月|个百分点|条|台|套|人|元|吨|公里|平方米)")
-PCT_SPACE = re.compile(r"\d\s+%")
-LATIN_GLUE = re.compile(r"[\u4e00-\u9fff][A-Za-z]|[A-Za-z][\u4e00-\u9fff]")
-DOT3 = re.compile(r"\.\.\.")
-DASH = re.compile(r"[—–]|(?<!\d)--(?!\d)")
-STRAIGHT_Q = re.compile(r"[\"']")
-
-BANNED = ["赋能", "闭环", "抓手", "一站式", "极致", "大幅", "显著", "轻松",
-          "一键", "完美", "领先", "全面提升", "深度赋能", "助力", "无缝"]
-ABSOLUTE = ["唯一", "最好", "第一", "彻底", "零缺陷"]
-VAGUE = ["较多", "较少", "较快", "较慢", "明显", "左右", "大约", "略有"]
-GENERIC_HEAD = ["概览", "概述", "结语", "小结", "其他", "更多", "详情", "备注",
-                "综述", "简介"]
-
-SEV_CRITICAL, SEV_HINT = "严重", "提示"
-
-
-class Finding:
-    def __init__(self, loc, code, msg, fix, sev):
-        self.loc, self.code, self.msg, self.fix, self.sev = loc, code, msg, fix, sev
-
-    def line(self, fname):
-        return f"{fname}:{self.loc} {self.code} {self.msg} → {self.fix}"
-
-    def as_dict(self):
-        return {"loc": self.loc, "code": self.code, "issue": self.msg,
-                "fix": self.fix, "severity": self.sev}
+from text_rules import (CJK, NUM, Finding, SEV_CRITICAL, SEV_HINT,
+                        check_writing as check_writing_shared)
 
 
 # ── 文档抽取 ────────────────────────────────────────────────────
 class Doc:
     def __init__(self):
         self.paragraphs = []       # [(loc, text, style, para_obj)]
-        self.tables = []           # [(loc, rows_of_cells, table_obj)]
+        self.tables = []           # [(loc, [cell_text], table_obj)]
         self.section = None
         self.doc = None
         self.kind = "text"
@@ -93,22 +65,6 @@ def load_text(path):
 
 
 # ── 排印检查 ───────────────────────────────────────────────────
-def body_size(paras):
-    """正文基准字号：按「段落数」取众数，只在正文样式段落里统计。"""
-    from collections import Counter
-
-    counter = Counter()
-    for _, text, style, p in paras:
-        if style.startswith("Heading") or style in ("Title", "Subtitle"):
-            continue
-        if not CJK.search(text) or len(text) < 15 or p is None:
-            continue
-        sz = eff_size(p, style)
-        if sz:
-            counter[round(sz * 2) / 2] += 1
-    return counter.most_common(1)[0][0] if counter else 11.0
-
-
 def eff_size(p, style_name=None, default=None):
     """段落有效字号：run 显式 > 段落样式 > Normal。"""
     for r in p.runs:
@@ -148,12 +104,26 @@ def leading_ratio(p, size):
     return float(ls)
 
 
+def body_size(paras):
+    """正文基准字号：按「段落数」取众数，只在正文样式段落里统计。"""
+    from collections import Counter
+
+    counter = Counter()
+    for _, text, style, p in paras:
+        if style.startswith("Heading") or style in ("Title", "Subtitle"):
+            continue
+        if not CJK.search(text) or len(text) < 15 or p is None:
+            continue
+        sz = eff_size(p, style)
+        if sz:
+            counter[round(sz * 2) / 2] += 1
+    return counter.most_common(1)[0][0] if counter else 11.0
+
+
 def preceding_declares_unit(table):
     """表前一段（正文顺序）是否写了「单位」。"""
-    from docx.table import Table
     from docx.text.paragraph import Paragraph
 
-    body = table._tbl.getparent()
     prev = table._tbl.getprevious()
     while prev is not None:
         if prev.tag.endswith("}p"):
@@ -170,7 +140,6 @@ def check_typography(d, out):
     if d.kind != "docx":
         return
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-    from docx.shared import Emu
 
     sec = d.section
     width_pt = (sec.page_width - sec.left_margin - sec.right_margin) / 12700.0
@@ -184,7 +153,7 @@ def check_typography(d, out):
                                f"版心 {width_pt:.0f}pt ÷ 正文 {size:g}pt ≈ 一行 {cpl:.0f} 汉字",
                                f"收版心到 {size * 35:.0f}pt 左右（约一行 35 字），别缩字号",
                                SEV_CRITICAL))
-        elif cpl < 20 and cpl > 0:
+        elif 0 < cpl < 20:
             out.append(Finding("layout", "T7",
                                f"一行只有 {cpl:.0f} 汉字，偏窄",
                                "略放宽版心或加大正文", SEV_HINT))
@@ -198,7 +167,7 @@ def check_typography(d, out):
         psize = eff_size(p, style, size)
         ratio = leading_ratio(p, psize)
         if ratio is not None:
-            # 大标题判定按字号，不只按样式：Normal 样式里手工敲的 26pt 标题也算
+            # 大标题判定按字号，不只按样式：Normal 里手工敲的 26pt 标题也算
             if psize >= 18 and ratio < 1.3:
                 big_lead.append((loc, psize, ratio))
             is_body_size = abs(psize - size) <= 0.6
@@ -301,30 +270,25 @@ def check_typography(d, out):
             out.append(Finding(loc, "T9", "表格画了网格线",
                                "关掉 insideH/insideV 与外框，只留表头细线 + 表尾粗线",
                                SEV_CRITICAL))
-        # T16 单位声明（表格自身或表前一段）
         if not re.search(r"单位", " ".join(cells)) and len(t.rows) >= 2:
             numeric = sum(1 for c in cells if NUM.match(c.replace(" ", "")))
             if numeric >= 3 and not preceding_declares_unit(t):
                 out.append(Finding(loc, "T16", "表格没有单位声明",
                                    "表头或表注写「金额单位：万元」", SEV_HINT))
-        # T10 数字列对齐
         for ci in range(len(t.columns)):
             col = [t.cell(ri, ci) for ri in range(len(t.rows))]
             nums = [c for c in col[1:] if NUM.match(c.text.strip().replace(" ", ""))]
             if len(nums) >= 3:
                 lefts = [c for c in nums
                          if c.paragraphs[0].alignment in
-                         (None, 0) or c.paragraphs[0].alignment == 0]
-                from docx.enum.text import WD_ALIGN_PARAGRAPH as A
-                lefts = [c for c in nums
-                         if c.paragraphs[0].alignment in (None, A.LEFT)]
+                         (None, WD_ALIGN_PARAGRAPH.LEFT)]
                 if lefts:
                     out.append(Finding(f"{loc}c{ci}", "T10",
                                        f"数字列左对齐（{len(lefts)} 格）",
                                        "数字右对齐，位数才能对齐", SEV_HINT))
                     break
 
-    # T12 字体族（run 显式 + 样式层，文档里的都要算）
+    # T12 字体族（run 显式 + 样式层）
     fams = set()
     for p in d.doc.paragraphs:
         for r in p.runs:
@@ -353,134 +317,33 @@ def check_typography(d, out):
                            sev))
 
     # T13 页码
-    ftr = sec.footer
-    has_page = False
-    for p in ftr.paragraphs:
-        xml = p._p.xml
-        if "PAGE" in xml:
-            has_page = True
+    has_page = any("PAGE" in p._p.xml for p in sec.footer.paragraphs)
     if not has_page:
         out.append(Finding("footer", "T13", "页脚没有页码", "加「第 x 页 / 共 y 页」",
                            SEV_HINT))
 
 
-# ── 书写检查 ───────────────────────────────────────────────────
+# ── 书写检查（转交 text_rules） ─────────────────────────────────
 def check_writing(d, out):
-    texts = [(loc, text) for loc, text, _, _ in d.paragraphs]
+    items = [(loc, text) for loc, text, _, _ in d.paragraphs]
     for loc, cells, _ in d.tables:
         for i, c in enumerate(cells):
-            texts.append((f"{loc}#{i}", c))
-    cells_all = [c for _, cs, _ in d.tables for c in cs]
+            items.append((f"{loc}#{i}", c))
 
-    def find(rep, code, msg, fix, sev, limit=1):
-        n = 0
-        first = None
-        for loc, text in texts:
-            for m in rep.finditer(text):
-                n += 1
-                if first is None:
-                    first = (loc, text[max(0, m.start() - 8):m.start() + 12])
-                if n >= limit and limit:
-                    break
-            if n >= limit and limit:
-                break
-        if n:
-            out.append(Finding(first[0], code, f"{msg}（{n} 处）",
-                               f"{fix}　例：「{first[1]}」", sev))
-
-    find(DASH, "W1", "用破折号当标点", "改冒号/逗号/句号，或重写", SEV_CRITICAL)
-    find(STRAIGHT_Q, "W2", "直引号", "中文用「」或“”", SEV_CRITICAL)
-    find(DOT3, "W3", "三个点", "用省略号 ……", SEV_HINT)
-    find(UNIT_GLUE, "W4", "数字与单位之间缺空格", "加半角空格：48.62 亿元", SEV_CRITICAL)
-    find(PCT_SPACE, "W5", "百分号前多一个空格", "改 6.7%", SEV_CRITICAL)
-    find(LATIN_GLUE, "W6", "中英混排缺空格", "汉字与拉丁之间加空格", SEV_HINT)
-
-    for word in BANNED:
-        find(re.compile(re.escape(word)), "W7", f"禁用词「{word}」",
-             "删掉或换成具体描述", SEV_CRITICAL, limit=1)
-        if out and out[-1].msg.startswith(f"禁用词「{word}」"):
-            continue
-    # 上面的循环会把每个禁用词都报一遍，压成一个汇总更好读
-    banned_hits = [f for f in out if f.code == "W7"]
-    if len(banned_hits) > 1:
-        keep = banned_hits[0]
-        keep.msg = f"禁用词 {len(banned_hits)} 种：" + "、".join(
-            f.msg.split("「")[1].split("」")[0] for f in banned_hits)
-        keep.fix = "删掉或换成具体描述"
-        for f in banned_hits[1:]:
-            out.remove(f)
-
-    for word in ABSOLUTE:
-        find(re.compile(re.escape(word)), "W8", f"绝对化断言「{word}」",
-             "无数据支撑就删", SEV_HINT, limit=1)
-    ab = [f for f in out if f.code == "W8"]
-    if len(ab) > 1:
-        keep = ab[0]
-        keep.msg = f"绝对化断言 {len(ab)} 种：" + "、".join(
-            f.msg.split("「")[1].split("」")[0] for f in ab)
-        for f in ab[1:]:
-            out.remove(f)
-
-    for word in VAGUE:
-        find(re.compile(re.escape(word)), "W13", f"模糊量词「{word}」",
-             "给数字，或删", SEV_HINT, limit=1)
-    vg = [f for f in out if f.code == "W13"]
-    if len(vg) > 1:
-        keep = vg[0]
-        keep.msg = f"模糊量词 {len(vg)} 种：" + "、".join(
-            f.msg.split("「")[1].split("」")[0] for f in vg)
-        for f in vg[1:]:
-            out.remove(f)
-
-    # W9 段落过长
-    long_par, long_sent = None, None
-    for loc, text, _, _ in d.paragraphs:
-        if len(text) < 30:
-            continue
-        sents = [s for s in re.split(r"[。！？；]", text) if s.strip()]
-        if len(sents) > 4 and long_par is None:
-            long_par = (loc, len(sents))
-        for s in sents:
-            if len(s) > 60 and long_sent is None:
-                long_sent = (loc, len(s))
-    if long_par:
-        out.append(Finding(long_par[0], "W9",
-                           f"段落 {long_par[1]} 句（> 4）", "拆段，一段一个意思",
-                           SEV_HINT))
-    if long_sent:
-        out.append(Finding(long_sent[0], "W9",
-                           f"单句 {long_sent[1]} 字（> 60）", "拆句，一句一个概念",
-                           SEV_HINT))
-
-    # W10 泛化标题
+    paragraphs = []
+    headings = []
     for loc, text, style, p in d.paragraphs:
-        t = text.strip()
-        if not t or len(t) > 8:
-            continue
-        head_like = style.startswith("Heading") or style == "Title" or \
-            (p is not None and p.runs and p.runs[0].font.size
-             and p.runs[0].font.size.pt >= 14)
-        if head_like and any(t.endswith(g) or t == g for g in GENERIC_HEAD):
-            out.append(Finding(loc, "W10", f"泛化标题「{t}」",
-                               "改成能预判内容的标题", SEV_HINT))
-            break
+        is_head = style.startswith("Heading") or style in ("Title", "Subtitle")
+        if not is_head:
+            paragraphs.append((loc, text))
+        elif text.strip() and len(text.strip()) <= 8:
+            headings.append((loc, text))
+        if text.strip() and len(text.strip()) <= 8 and not is_head \
+                and p is not None and p.runs and p.runs[0].font.size \
+                and p.runs[0].font.size.pt >= 14:
+            headings.append((loc, text))
 
-    # W11 主语混用
-    full = d.all_text()
-    has_company = "公司" in full
-    has_we = re.search(r"我们|笔者|本人", full) is not None
-    if has_company and has_we:
-        out.append(Finding("all", "W11", "「公司」与「我们/笔者」同篇混用",
-                           "全篇统一一个主语", SEV_CRITICAL))
-
-    # W12 单位口径
-    if "亿元" in full and "万元" in full:
-        out.append(Finding("all", "W12", "同篇出现「亿元」与「万元」",
-                           "检查同一指标有没有换过单位；并用时在表注里声明",
-                           SEV_HINT))
-    if "个百分点" in full and re.search(r"\d\s*pt", full):
-        out.append(Finding("all", "W12", "「个百分点」与「pt」混用",
-                           "统一写「个百分点」", SEV_CRITICAL))
+    check_writing_shared(items, out, paragraphs=paragraphs, headings=headings)
 
 
 # ── 主流程 ─────────────────────────────────────────────────────
@@ -495,7 +358,8 @@ def main():
     ext = args.path.lower().rsplit(".", 1)[-1] if "." in args.path else ""
     if not is_docx and ext not in ("md", "mdx", "txt", "markdown"):
         print(f"只支持 .docx / .md / .txt（收到 .{ext}）；"
-              f"PDF 请先转成 docx，或导出为 .md 再审计", file=sys.stderr)
+              f"PDF 请先转成 docx，或导出为 .md 再审计；"
+              f"Excel 请用 audit_xlsx.py", file=sys.stderr)
         return 2
     if is_docx:
         try:

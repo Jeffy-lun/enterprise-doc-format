@@ -1,9 +1,9 @@
 ---
 name: enterprise-doc-format
-description: "When the user writes, restyles, or reviews a business document (annual report, board paper, proposal, white paper, memo, SOP, contract summary, resume) and expects it to read well and look professionally typeset — especially Chinese or mixed CJK/Latin Word/PowerPoint/Excel/PDF output. Also use when asked to 'check formatting', '审一下排版', '这份文档哪里别扭', '按规范检查文档', or to fix inconsistent fonts/line spacing/table borders. Covers prose rules (voice, banned words, units, numbers, headings, AI tells) and typographic rules (type scale, CJK leading, tracking, measure, table rules, page setup) and can audit or restyle a .docx automatically."
+description: "When the user writes, restyles, or reviews a business document (annual report, board paper, proposal, white paper, memo, SOP, contract summary, resume) and expects it to read well and look professionally typeset — especially Chinese or mixed CJK/Latin Word/PowerPoint/Excel/PDF output. Also use when asked to 'check formatting', '审一下排版', '这份文档哪里别扭', '按规范检查文档', '这张表怎么这么难看', or to fix inconsistent fonts/line spacing/table borders/gridlines/number formats. Covers prose rules (voice, banned words, units, numbers, headings, AI tells), typographic rules (type scale, CJK leading, tracking, measure, table rules, page setup), and comes with scripts that audit .docx and .xlsx automatically."
 description_zh: "企业办公文件（年报/董事会材料/方案/白皮书/汇报/制度）的书写规范与排印规范检查与重排；可用脚本自动审 .docx 并一键套用公司版式。"
 description_en: "Write, audit, and restyle business documents: prose rules plus CJK-aware typography, with scripts that check and reformat .docx files."
-version: 1.0.0
+version: 1.1.0
 allowed-tools: Bash, Read, Write, Edit
 metadata:
   emoji: "📄"
@@ -77,8 +77,10 @@ metadata:
 ### 4. 自动检查，改到零严重
 
 ```bash
-python scripts/audit_docx.py 报告.docx            # 人读清单
+python scripts/audit_docx.py 报告.docx            # Word / Markdown / 纯文本
 python scripts/audit_docx.py 报告.docx --json     # 机读，给 agent 迭代
+python scripts/audit_xlsx.py 报表.xlsx            # Excel 工作簿
+python scripts/audit_xlsx.py 报表.xlsx --sheet 利润表
 python scripts/audit_docx.py notes.md             # 纯文本/ Markdown 只跑书写规则
 ```
 
@@ -108,6 +110,7 @@ python scripts/restyle_docx.py 报告.docx --style board --inplace # 就地改�
 - [ ] 全篇同一套字号（≤ 7 档）、同一套字体（≤ 2 族）
 - [ ] 大标题没有撞行；正文没有一行超过 40 汉字
 - [ ] 表格没有网格线；数字右对齐且位数对齐
+- [ ] **Excel**：网格线已关、数字有格式（千分位 / 百分比）、列宽不截断、比率没存成小数、表头加粗且有单位声明
 - [ ] 有页码；打印预览无孤行、表格不跨页
 - [ ] 没有 `—`、`...`、`"`、`6.7 %`、`48.62亿元`
 
@@ -126,7 +129,9 @@ python scripts/restyle_docx.py 报告.docx --style board --inplace # 就地改�
 | `references/typography.md` | 排印规范全量（阶梯、行高、字距、行长、表格、分页、CJK 覆盖） |
 | `references/house-styles.md` | 三套可直接用的企业版式（pt 值、表格线、页眉页脚） |
 | `references/office-params.md` | Word / Excel / PPT / PDF 各自的落地参数与坑 |
-| `references/checklist.md` | 检查矩阵（编号 ↔ 规则 ↔ 严重度） |
+| `references/checklist.md` | 检查矩阵（编号 ↔ 规则 ↔ 严重度），含 Excel 的 X 编号 |
 | `scripts/audit_docx.py` | 审计 .docx / .md / .txt，输出问题清单 |
+| `scripts/audit_xlsx.py` | 审计 .xlsx / .xlsm（网格线、数字格式、列宽、混列、打印设置） |
+| `scripts/text_rules.py` | 书写规则共用实现（两个审计器都走它，避免规则分叉） |
 | `scripts/restyle_docx.py` | 按预设重排 .docx 样式层 |
 | `install/DEFAULT-INVOKE.md` | 让各 agent（Claude / DSH / 豆包 / WorkBuddy）默认调用 |

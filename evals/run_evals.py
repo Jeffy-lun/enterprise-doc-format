@@ -19,6 +19,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 AUDIT = os.path.join(ROOT, "scripts", "audit_docx.py")
+AUDIT_XLSX = os.path.join(ROOT, "scripts", "audit_xlsx.py")
 RESTYLE = os.path.join(ROOT, "scripts", "restyle_docx.py")
 FIX = os.path.join(HERE, "fixtures")
 
@@ -35,6 +36,13 @@ def audit(path):
     code, out, err = run(AUDIT, path, "--json")
     if not out.strip():
         raise RuntimeError(f"audit 无输出：{err}")
+    return code, json.loads(out)
+
+
+def audit_xlsx(path):
+    code, out, err = run(AUDIT_XLSX, path, "--json")
+    if not out.strip():
+        raise RuntimeError(f"audit_xlsx 无输出：{err}")
     return code, json.loads(out)
 
 
@@ -86,10 +94,40 @@ def main():
             print("  -", f)
         return 1
 
+    # ── Excel ───────────────────────────────────────────────
+    bad_x = os.path.join(FIX, "bad.xlsx")
+    good_x = os.path.join(FIX, "good.xlsx")
+    for f in (bad_x, good_x):
+        if not os.path.exists(f):
+            failures.append(f"缺少 fixture：{f}")
+    if not failures:
+        xcode, xdata = audit_xlsx(bad_x)
+        xcodes = {f["code"] for f in xdata["findings"]}
+        if xcode != 1:
+            failures.append(f"bad.xlsx 退出码应为 1，实为 {xcode}")
+        for need in ("X1", "X2", "X9", "X12"):
+            if need not in xcodes:
+                failures.append(f"bad.xlsx 漏判 {need}（实际：{sorted(xcodes)}）")
+
+        xcode2, xdata2 = audit_xlsx(good_x)
+        if xcode2 != 0 or xdata2["critical"] != 0:
+            msgs = [f'{f["code"]} {f["issue"]}' for f in xdata2["findings"]
+                    if f["severity"] == "严重"]
+            failures.append(f"good.xlsx 误判严重项：{msgs}")
+
+    if failures:
+        print("✗ 失败（Excel 部分）")
+        for f in failures:
+            print("  -", f)
+        return 1
+
     print("✓ 全部通过")
     print(f"  bad.docx：严重 {data['critical']} / 提示 {data['hint']}"
           f"　命中 {len(codes)} 类")
     print(f"  good.docx：严重 {data2['critical']} / 提示 {data2['hint']}")
+    print(f"  bad.xlsx：严重 {xdata['critical']} / 提示 {xdata['hint']}"
+          f"　命中 {len(xcodes)} 类")
+    print(f"  good.xlsx：严重 {xdata2['critical']} / 提示 {xdata2['hint']}")
     return 0
 
 
