@@ -301,10 +301,168 @@ def make_good_xlsx(path):
     wb.save(path)
 
 
+def _pixel():
+    """造一张 8×8 PNG 供 fixture 用（图片无替代文本才能测 P12）。"""
+    from PIL import Image
+
+    path = os.path.join(OUT, "_pixel.png")
+    if not os.path.exists(path):
+        os.makedirs(OUT, exist_ok=True)
+        Image.new("RGB", (8, 8), (200, 200, 200)).save(path)
+    return path
+
+
+def make_bad_pptx(path):
+    """幻灯片的典型样子：4:3、正文 12pt、一页 9 条要点、一页念稿、
+    中文斜体、三种字体、图表带网格线、图片没替代文本。"""
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Emu, Pt
+
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = Emu(9144000), Emu(6858000)  # 4:3
+
+    # 第 1 页：标题 + 9 条要点 + 12pt
+    s1 = prs.slides.add_slide(prs.slide_layouts[1])
+    s1.shapes.title.text = "2025年经营情况"
+    body = s1.placeholders[1].text_frame
+    body.text = "营业收入48.62亿元"
+    for line in ("归母净利润5.31亿元", "经营现金流7.05亿元", "研发投入3.28亿元",
+                 "毛利率31.6%", "海外收入10.41亿元", "越南工厂投产",
+                 "在手订单21.4亿元", "分红1.20亿元"):
+        body.add_paragraph().text = line
+    for p in body.paragraphs:
+        for r in p.runs:
+            r.font.size = Pt(12)
+            r.font.name = "宋体"
+
+    # 第 2 页：念稿（200+ 字）+ 中文斜体
+    s2 = prs.slides.add_slide(prs.slide_layouts[1])
+    s2.shapes.title.text = "业务回顾"
+    tb = s2.placeholders[1].text_frame
+    tb.text = ("2025 年公司实现营业收入 48.62 亿元，同比增长 12.4%；归属于母公司股东的"
+               "净利润 5.31 亿元，同比增长 8.7%，低于营收增速。二季度钢材价格上行，"
+               "上年 640 万元的汇兑收益又转为本年 2,180 万元损失，净利增速因此被压住。"
+               "公司没有把增速放缓全部归因于外部环境，三季度完成产线改造。")
+    for p in tb.paragraphs:
+        for r in p.runs:
+            r.font.size = Pt(12)
+            r.font.name = "宋体"
+            r.font.italic = True
+
+    # 第 3 页：标题 + 图表（带网格线）+ 图片（无替代文本）+ 另一种字体
+    s3 = prs.slides.add_slide(prs.slide_layouts[5])
+    s3.shapes.title.text = "收入结构"
+    data = CategoryChartData()
+    data.categories = ["传动部件", "系统集成", "运维服务"]
+    data.add_series("营收", (26.80, 15.42, 6.40))
+    s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Emu(600000),
+                        Emu(1600000), Emu(5000000), Emu(3000000), data)
+    s3.shapes.add_picture(_pixel(), Emu(6100000), Emu(1600000),
+                          Emu(1200000), Emu(1200000))
+    # 图片替代文本留空（真实文件里最常见的样子）
+    for shp in s3.shapes:
+        if getattr(shp, "shape_type", None) is not None:
+            from pptx.enum.shapes import MSO_SHAPE_TYPE
+            if shp.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                shp._element.nvPicPr.cNvPr.set("descr", "")
+    # 一张四边都有框的表格
+    tbl = s3.shapes.add_table(4, 3, Emu(600000), Emu(4800000),
+                              Emu(5000000), Emu(1200000)).table
+    for ri, row in enumerate((("项目", "2025", "2024"),
+                              ("营收（亿元）", "48.62", "43.25"),
+                              ("净利（亿元）", "5.31", "4.88"),
+                              ("毛利率", "31.6%", "30.2%"))):
+        for ci, val in enumerate(row):
+            tbl.cell(ri, ci).text = val
+
+    # 第 4 页：无标题，正文用普通文本框（没有大纲结构）
+    s4 = prs.slides.add_slide(prs.slide_layouts[6])
+    for i in range(4):
+        box = s4.shapes.add_textbox(Emu(600000), Emu(600000 + i * 800000),
+                                    Emu(6000000), Emu(600000))
+        para = box.text_frame.paragraphs[0]
+        run = para.add_run()
+        run.text = f"第 {i + 1} 条：公司口径为 48.62亿元，未经审计"
+        run.font.size = Pt(11)
+        run.font.name = "Calibri"
+
+    prs.save(path)
+
+
+def make_good_pptx(path):
+    """一页一个主张：16:9、标题 32pt、正文 18pt、每页 ≤6 条 ≤120 字、
+    图表无网格线、用版式占位符、全大写字距。"""
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Emu, Pt
+
+    prs = Presentation()                      # 默认 4:3，显式改成 16:9
+    prs.slide_width, prs.slide_height = Emu(12192000), Emu(6858000)
+
+    def set_run(run, size, bold=False, name="微软雅黑", color="111111",
+                spc=None):
+        run.font.size = Pt(size)
+        run.font.bold = bold
+        run.font.name = name
+        run.font.italic = False
+        rPr = run._r.get_or_add_rPr()
+        rPr.set("lang", "zh-CN")
+        if spc:
+            rPr.set("spc", str(spc))
+
+    # 第 1 页：标题 + 3 条
+    s1 = prs.slides.add_slide(prs.slide_layouts[1])
+    s1.shapes.title.text = "2025 年营收 48.62 亿元，增长 12.4%"
+    for p in s1.shapes.title.text_frame.paragraphs:
+        for r in p.runs:
+            set_run(r, 32, bold=True, name="宋体")
+    tf = s1.placeholders[1].text_frame
+    tf.text = "净利 5.31 亿元，同比 +8.7%，低于营收增速"
+    for line in ("海外收入占比 21.4%（上年 17.8%）", "在手订单 21.4 亿元，覆盖 6 个月"):
+        tf.add_paragraph().text = line
+    for p in tf.paragraphs:
+        for r in p.runs:
+            set_run(r, 18)
+
+    # 第 2 页：图表，无网格线
+    s2 = prs.slides.add_slide(prs.slide_layouts[5])
+    s2.shapes.title.text = "三条业务线，运维毛利率最高（41.8%）"
+    for p in s2.shapes.title.text_frame.paragraphs:
+        for r in p.runs:
+            set_run(r, 28, bold=True, name="宋体")
+    data = CategoryChartData()
+    data.categories = ["传动部件", "系统集成", "运维服务"]
+    data.add_series("营收（亿元）", (26.80, 15.42, 6.40))
+    ch = s2.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, 609600, 1600200,
+                             5486400, 3200400, data).chart
+    ch.has_legend = False
+    ch.value_axis.has_major_gridlines = False
+    ch.value_axis.visible = False
+
+    # 第 3 页：全大写 kicker 带字距
+    s3 = prs.slides.add_slide(prs.slide_layouts[5])
+    s3.shapes.title.text = "2026 年的承诺"
+    for p in s3.shapes.title.text_frame.paragraphs:
+        for r in p.runs:
+            set_run(r, 28, bold=True, name="宋体")
+    kicker = s3.shapes.add_textbox(609600, 3200400, 5486400, 457200)
+    kp = kicker.text_frame.paragraphs[0]
+    kr = kp.add_run()
+    kr.text = "OUTLOOK 2026"
+    set_run(kr, 12, spc=800)
+
+    prs.save(path)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     make_bad(os.path.join(OUT, "bad.docx"))
     make_good(os.path.join(OUT, "good.docx"))
     make_bad_xlsx(os.path.join(OUT, "bad.xlsx"))
     make_good_xlsx(os.path.join(OUT, "good.xlsx"))
+    make_bad_pptx(os.path.join(OUT, "bad.pptx"))
+    make_good_pptx(os.path.join(OUT, "good.pptx"))
     print("fixtures:", OUT)

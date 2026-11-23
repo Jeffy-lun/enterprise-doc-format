@@ -20,26 +20,30 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install deps
-        run: python -m pip install --upgrade pip python-docx openpyxl lxml
+        run: python -m pip install --upgrade pip python-docx openpyxl python-pptx xlsxwriter lxml pillow
 
       - name: Build fixtures
         run: python evals/make_fixtures.py
 
-      - name: Regression (audit + restyle, docx & xlsx)
+      - name: Regression (audit + restyle, docx & xlsx & pptx)
         run: python evals/run_evals.py
 
       - name: Audit compliant fixtures (must exit 0)
         run: |
           python scripts/audit_docx.py evals/fixtures/good.docx
           python scripts/audit_xlsx.py evals/fixtures/good.xlsx
+          python scripts/audit_pptx.py evals/fixtures/good.pptx
 
       - name: Audit broken fixtures (must exit 1)
         run: |
-          if python scripts/audit_docx.py evals/fixtures/bad.docx; then
-            echo "expected non-zero exit for bad.docx"
-            exit 1
-          fi
-          if python scripts/audit_xlsx.py evals/fixtures/bad.xlsx; then
-            echo "expected non-zero exit for bad.xlsx"
-            exit 1
-          fi
+          for f in bad.docx bad.xlsx bad.pptx; do
+            case "$f" in
+              *.docx) script=scripts/audit_docx.py ;;
+              *.xlsx) script=scripts/audit_xlsx.py ;;
+              *.pptx) script=scripts/audit_pptx.py ;;
+            esac
+            if python "$script" "evals/fixtures/$f"; then
+              echo "expected non-zero exit for $f"
+              exit 1
+            fi
+          done

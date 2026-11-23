@@ -75,6 +75,24 @@
       "expect": ["严重 0 条", "退出码 0"]
     },
     {
+      "id": "pptx-one-idea-per-slide",
+      "why": "一页 9 条要点 + 153 字 = 把文档贴进幻灯片，投影上没人能读",
+      "input": "4:3 画布、正文 12pt、一页 9 条、一页 153 字",
+      "expect": ["P1 触发（严重）", "P2 触发（严重）", "P3 触发（严重）", "P11 触发（提示）"]
+    },
+    {
+      "id": "pptx-structure-and-a11y",
+      "why": "全靠普通文本框会丢大纲，图片没 alt 在投影与无障碍场景都是漏",
+      "input": "4 个非占位符文本框、图片 descr 为空、某页无标题",
+      "expect": ["P10 触发", "P12 触发", "P14 触发"]
+    },
+    {
+      "id": "pptx-clean-deck",
+      "why": "排好的幻灯片不该被误判（含 12pt 全大写 kicker 不算正文）",
+      "input": "16:9、标题 32/28pt、正文 18pt、每页 ≤3 条 ≤60 字、图表关网格线、kicker 带字距",
+      "expect": ["严重 0 条", "提示 0 条", "退出码 0"]
+    },
+    {
       "id": "unsupported-format",
       "why": "把 PDF 当文本读会输出乱码，必须挡住",
       "input": "audit_docx.py 传入 .pdf",

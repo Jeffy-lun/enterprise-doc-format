@@ -20,6 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 AUDIT = os.path.join(ROOT, "scripts", "audit_docx.py")
 AUDIT_XLSX = os.path.join(ROOT, "scripts", "audit_xlsx.py")
+AUDIT_PPTX = os.path.join(ROOT, "scripts", "audit_pptx.py")
 RESTYLE = os.path.join(ROOT, "scripts", "restyle_docx.py")
 FIX = os.path.join(HERE, "fixtures")
 
@@ -43,6 +44,13 @@ def audit_xlsx(path):
     code, out, err = run(AUDIT_XLSX, path, "--json")
     if not out.strip():
         raise RuntimeError(f"audit_xlsx 无输出：{err}")
+    return code, json.loads(out)
+
+
+def audit_pptx(path):
+    code, out, err = run(AUDIT_PPTX, path, "--json")
+    if not out.strip():
+        raise RuntimeError(f"audit_pptx 无输出：{err}")
     return code, json.loads(out)
 
 
@@ -121,6 +129,33 @@ def main():
             print("  -", f)
         return 1
 
+    # ── PowerPoint ──────────────────────────────────────────
+    bad_p = os.path.join(FIX, "bad.pptx")
+    good_p = os.path.join(FIX, "good.pptx")
+    for f in (bad_p, good_p):
+        if not os.path.exists(f):
+            failures.append(f"缺少 fixture：{f}")
+    if not failures:
+        pcode, pdata = audit_pptx(bad_p)
+        pcodes = {f["code"] for f in pdata["findings"]}
+        if pcode != 1:
+            failures.append(f"bad.pptx 退出码应为 1，实为 {pcode}")
+        for need in ("P1", "P2", "P3", "P7", "P9", "P10", "P11", "P12", "P14"):
+            if need not in pcodes:
+                failures.append(f"bad.pptx 漏判 {need}（实际：{sorted(pcodes)}）")
+
+        pcode2, pdata2 = audit_pptx(good_p)
+        if pcode2 != 0 or pdata2["critical"] != 0:
+            msgs = [f'{f["code"]} {f["issue"]}' for f in pdata2["findings"]
+                    if f["severity"] == "严重"]
+            failures.append(f"good.pptx 误判严重项：{msgs}")
+
+    if failures:
+        print("✗ 失败（PowerPoint 部分）")
+        for f in failures:
+            print("  -", f)
+        return 1
+
     print("✓ 全部通过")
     print(f"  bad.docx：严重 {data['critical']} / 提示 {data['hint']}"
           f"　命中 {len(codes)} 类")
@@ -128,6 +163,9 @@ def main():
     print(f"  bad.xlsx：严重 {xdata['critical']} / 提示 {xdata['hint']}"
           f"　命中 {len(xcodes)} 类")
     print(f"  good.xlsx：严重 {xdata2['critical']} / 提示 {xdata2['hint']}")
+    print(f"  bad.pptx：严重 {pdata['critical']} / 提示 {pdata['hint']}"
+          f"　命中 {len(pcodes)} 类")
+    print(f"  good.pptx：严重 {pdata2['critical']} / 提示 {pdata2['hint']}")
     return 0
 
 

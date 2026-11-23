@@ -5,11 +5,12 @@
 - [Vercel Writing Guidelines](https://github.com/vercel-labs/writing-guidelines)（prose 规则：语气、结构、数字、单位、标点、AI 腔）
 - OpenDesign `craft/typography.md` + `typography-hierarchy(.editorial)`（排印规则：字号阶梯、CJK 行高、字距、行长、表格、分页）
 
-两套规则原本是给英文开发者文档和网页设计用的。这个技能把它们重写成**中文企业文件可用**的版本，加了三件事：
+两套规则原本是给英文开发者文档和网页设计用的。这个技能把它们重写成**中文企业文件可用**的版本，加了四件事：
 
 1. **自动审计（Word）**：`scripts/audit_docx.py` 读一份 .docx，输出 `文件:位置 编号 问题 → 改法`，严重项 > 0 时退出码 1。
 2. **自动审计（Excel）**：`scripts/audit_xlsx.py` 查网格线、数字格式、列宽截断、数字列夹文字、比率存成小数、冻结与打印设置 —— 企业报表的四个常见死因。
-3. **一键重排**：`scripts/restyle_docx.py` 按预设（`board` / `whitepaper` / `memo`）改样式层——字体、字号、固定行距、段距、对齐、表格线、页码。不改一个字。
+3. **自动审计（PowerPoint）**：`scripts/audit_pptx.py` 查一页几个主张、正文是否 ≥16pt、是否在念稿、图表网格线、图片 alt —— 判断「这页能不能在 5 秒内读到主张」。
+4. **一键重排**：`scripts/restyle_docx.py` 按预设（`board` / `whitepaper` / `memo`）改样式层——字体、字号、固定行距、段距、对齐、表格线、页码。不改一个字。
 
 ## 一分钟上手
 
@@ -23,11 +24,14 @@ python scripts/audit_docx.py 年报.docx --json
 # Excel 审计
 python scripts/audit_xlsx.py 报表.xlsx
 
+# PowerPoint 审计
+python scripts/audit_pptx.py 汇报.pptx
+
 # 按董事会版式重排（另存 年报-排版版.docx）
 python scripts/restyle_docx.py 年报.docx --style board
 ```
 
-依赖：`python-docx`、`openpyxl`、`lxml`（`pip install python-docx openpyxl`）。
+依赖：`python-docx`、`openpyxl`、`python-pptx`、`lxml`（`pip install python-docx openpyxl python-pptx`）。
 
 ## 输出长什么样
 
@@ -59,6 +63,13 @@ Excel 同理（同一份财务报表，两种排法）：
 | 严重项 | **8** | **0** |
 | 命中的问题 | X1 网格线、X2 General 格式、X3 数字左对齐、X4 列宽截断、X8 全网格边框、X9 表头无区分、X11 无打印设置 + 文字类 W4/W8 | — |
 
+PowerPoint 同理（同一套内容，两种做法）：
+
+| | 未排印 | 精排 |
+|---|---|---|
+| 严重项 | **7** | **0** |
+| 命中的问题 | P1 正文 12pt、P2 一页 9 条、P3 一页 153 字在念稿、P7 中文斜体、P10 全靠文本框、P11 4:3 画幅、P12 图片无 alt、P14 缺标题 + P9 图表网格线 | — |
+
 ## 内容
 
 ```
@@ -72,7 +83,8 @@ references/
 scripts/
   audit_docx.py              审计 .docx / .md / .txt
   audit_xlsx.py              审计 .xlsx / .xlsm
-  text_rules.py              书写规则共用实现（两个审计器都走它）
+  audit_pptx.py              审计 .pptx
+  text_rules.py              书写规则共用实现（三个审计器都走它）
   restyle_docx.py            按预设重排 .docx 样式层
 install/DEFAULT-INVOKE.md    让各 agent 默认调用
 evals/                       fixture 生成器 + 回归测试
@@ -129,7 +141,9 @@ cp -r enterprise-doc-format ~/.agents/skills/
 
 ## 版本
 
-`1.1.0` — 新增 Excel 审计（`audit_xlsx.py`，X1–X15），书写规则抽成 `text_rules.py` 供两个审计器共用；evals 增加 xlsx fixture。
+`1.2.0` — 新增 PowerPoint 审计（`audit_pptx.py`，P1–P15）：一页一主张、正文 ≥16pt、念稿、图表网格线、alt 文本、画幅；evals 增加 pptx fixture，CI 三格式全跑。
+
+`1.1.0` — 新增 Excel 审计（`audit_xlsx.py`，X1–X15），书写规则抽成 `text_rules.py` 供多个审计器共用；evals 增加 xlsx fixture。
 
 `1.0.0` — 首次发布。规则来源锁定：writing-guidelines `83e2316`；OpenDesign craft 规则库同期快照。
 
