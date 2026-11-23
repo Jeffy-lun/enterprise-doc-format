@@ -1,0 +1,60 @@
+{
+  "skill": "enterprise-doc-format",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "typography-missed-leading",
+      "why": "中文正文用单倍行距是最常见、最贵的错",
+      "input": "中文 docx，正文 10.5pt、行距 1.0、左对齐",
+      "expect": ["T1 触发，严重", "改法是「行距改固定值 19pt（1.8 倍）」"]
+    },
+    {
+      "id": "typography-headline-collision",
+      "why": "中文大标题沿用拉丁 1.0 行距会撞行",
+      "input": "封面主标题 26pt、行距 1.0",
+      "expect": ["T4 触发，严重", "改法是固定值约 1.35 倍"]
+    },
+    {
+      "id": "typography-table-grid",
+      "why": "Table Grid 是默认表格样式，网格线糊住数据",
+      "input": "表头带网格线的 4 列 5 行表格",
+      "expect": ["T9 触发，严重", "restyle 后 T9 消失且表格仍有表头/表尾线"]
+    },
+    {
+      "id": "writing-number-glue",
+      "why": "「48.62亿元」缺空格，中文排版规范要求加",
+      "input": "正文含「营收48.62亿元，同比增12.4%」",
+      "expect": ["W4 触发，严重", "示例片段能在输出里看到"]
+    },
+    {
+      "id": "writing-subject-mix",
+      "why": "同篇混用公司与我们是审计最容易漏的主观问题",
+      "input": "正文既出现「公司」又出现「我们」",
+      "expect": ["W11 触发，严重", "改法要求全篇统一"]
+    },
+    {
+      "id": "writing-unit-collision",
+      "why": "「个百分点」与「pt」混用会让读者算错",
+      "input": "表格写「+1.4pt」，正文写「1.4 个百分点」",
+      "expect": ["W12 触发，严重"]
+    },
+    {
+      "id": "false-positive-clean-doc",
+      "why": "合规文档不应报严重项，否则 agent 会改坏好文档",
+      "input": "按 board 预设排好的 docx（宋体标题 + 雅黑正文 + 固定行距 + 无网格表 + 页码）",
+      "expect": ["严重 0 条", "退出码 0", "最多剩 1–2 条提示（亿元/万元并用这类）"]
+    },
+    {
+      "id": "restyle-idempotent",
+      "why": "重排脚本重复跑不应越改越乱",
+      "input": "同一 docx 连续 restyle 两次",
+      "expect": ["两次产物的审计结果一致", "表格线仍只有表头/表尾"]
+    },
+    {
+      "id": "unsupported-format",
+      "why": "把 PDF 当文本读会输出乱码，必须挡住",
+      "input": "audit_docx.py 传入 .pdf",
+      "expect": ["退出码 2", "提示先转 docx 或导出 .md"]
+    }
+  ]
+}
