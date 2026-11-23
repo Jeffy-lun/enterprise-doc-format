@@ -65,7 +65,17 @@ install/DEFAULT-INVOKE.md    让各 agent 默认调用
 evals/evals.json             自测用例
 ```
 
-## 安装
+## 一句话装进 agent（WorkBuddy / 豆包 / 任何能跑命令的助手）
+
+把下面整段复制给你的 agent（WorkBuddy、豆包、Cursor 里的助手都行），它会自己下载、解压、装好并立刻按这套规范工作：
+
+```text
+请从这里下载并安装一个写作与排版技能：https://github.com/Jeffy-lun/enterprise-doc-format/releases/download/v1.0.0/enterprise-doc-format-1.0.0.zip —— 解压后把 enterprise-doc-format 整个目录放到你的技能目录（WorkBuddy 为 %USERPROFILE%\.workbuddy\skills-marketplace\skills\，其他平台放到你的 skills 目录），确认目录里有 SKILL.md 和 scripts/audit_docx.py；装不了文件时（例如没有文件写入权限），就把 SKILL.md 全文读进上下文当作常驻规范；无论哪种方式，装完先回我一句「enterprise-doc-format 已安装 + 版本号」，然后把它作为此后所有企业文档（年报、董事会材料、方案书、白皮书、汇报、周报、制度、SOP、会议纪要、对外函件、简历）的书写与排版规范执行：先按 references/house-styles.md 定版式，内容遵 references/writing.md，排版遵 references/typography.md，交付前运行 python scripts/audit_docx.py <文件>，严重项必须为 0 才算完成。
+```
+
+它会做四件事：下载 → 落到技能目录（或降级为读入上下文）→ 自报版本 → 之后所有文档都按规范走并跑审计。装完想确认生效，随便让它写一份带表格的汇报，看中文行距是不是 1.7–1.8、有没有跑 `audit_docx.py`。
+
+## 安装（手动）
 
 ### Claude Code / Claude Desktop（Agent Skills）
 

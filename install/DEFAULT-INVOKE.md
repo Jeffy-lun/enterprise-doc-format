@@ -1,6 +1,16 @@
 # 让 agent 默认调用这个技能
 
-技能装好只是「可用」。要让它**默认被调用**，得在 agent 的常驻指令里写一句。下面四种形态按平台选一段。
+技能装好只是「可用」。要让它**默认被调用**，得在 agent 的常驻指令里写一句。下面五种形态按平台选一段。
+
+---
+
+## 0. 连安装一起交给 agent（最快）
+
+把这一整段丢给 WorkBuddy / 豆包 / 任何能跑命令的助手，它会自己下载、安装、自报版本，之后按规范工作：
+
+```text
+请从这里下载并安装一个写作与排版技能：https://github.com/Jeffy-lun/enterprise-doc-format/releases/download/v1.0.0/enterprise-doc-format-1.0.0.zip —— 解压后把 enterprise-doc-format 整个目录放到你的技能目录（WorkBuddy 为 %USERPROFILE%\.workbuddy\skills-marketplace\skills\，其他平台放到你的 skills 目录），确认目录里有 SKILL.md 和 scripts/audit_docx.py；装不了文件时（例如没有文件写入权限），就把 SKILL.md 全文读进上下文当作常驻规范；无论哪种方式，装完先回我一句「enterprise-doc-format 已安装 + 版本号」，然后把它作为此后所有企业文档（年报、董事会材料、方案书、白皮书、汇报、周报、制度、SOP、会议纪要、对外函件、简历）的书写与排版规范执行：先按 references/house-styles.md 定版式，内容遵 references/writing.md，排版遵 references/typography.md，交付前运行 python scripts/audit_docx.py <文件>，严重项必须为 0 才算完成。
+```
 
 ---
 
