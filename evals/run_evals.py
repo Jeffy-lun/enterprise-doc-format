@@ -80,6 +80,18 @@ def main():
                 if f["severity"] == "严重"]
         failures.append(f"good.docx 误判严重项：{msgs}")
 
+    # 3b：图片段落固定行距必须报 T17（导出 PDF 会变空白）
+    bad_img = os.path.join(FIX, "bad-img.docx")
+    if not os.path.exists(bad_img):
+        failures.append(f"缺少 fixture：{bad_img}")
+    else:
+        icode, idata = audit(bad_img)
+        icodes = {f["code"] for f in idata["findings"]}
+        if icode != 1:
+            failures.append(f"bad-img.docx 退出码应为 1，实为 {icode}")
+        if "T17" not in icodes:
+            failures.append(f"bad-img.docx 漏判 T17（实际：{sorted(icodes)}）")
+
     # 4：重排只清排印项，文字项保留
     with tempfile.TemporaryDirectory() as td:
         out = os.path.join(td, "restyled.docx")

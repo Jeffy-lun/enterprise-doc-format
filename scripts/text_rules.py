@@ -19,7 +19,7 @@ STRAIGHT_Q = re.compile(r"[\"']")
 
 BANNED = ["赋能", "闭环", "抓手", "一站式", "极致", "大幅", "显著", "轻松",
           "一键", "完美", "领先", "全面提升", "深度赋能", "助力", "无缝"]
-ABSOLUTE = ["唯一", "最好", "第一", "彻底", "零缺陷"]
+ABSOLUTE = ["唯一", "最好", "第一名", "彻底", "零缺陷"]
 VAGUE = ["较多", "较少", "较快", "较慢", "明显", "左右", "大约", "略有"]
 GENERIC_HEAD = ["概览", "概述", "结语", "小结", "其他", "更多", "详情", "备注",
                 "综述", "简介"]
@@ -102,17 +102,20 @@ def check_writing(items, out, *, paragraphs=None, headings=None,
     _merge_by_code(out, "W13", len(VAGUE), "模糊量词 ")
 
     # W9 段落过长（只对段落生效，表格单元格不参与）
+    # 含三个以上顿号的句子视为列举，列举读起来不累，不计入长句。
+    def _sents(text):
+        return [s for s in re.split(r"[。！？；]", text) if s.strip()]
+
     for loc, text in (paragraphs if paragraphs is not None else []):
         if len(text) < 30:
             continue
-        sents = [s for s in re.split(r"[。！？；]", text) if s.strip()]
-        if len(sents) > 4:
-            out.append(Finding(loc, "W9", f"段落 {len(sents)} 句（> 4）",
+        if len(_sents(text)) > 4:
+            out.append(Finding(loc, "W9", f"段落 {len(_sents(text))} 句（> 4）",
                                "拆段，一段一个意思", SEV_HINT))
             break
     for loc, text in (paragraphs if paragraphs is not None else []):
-        long_s = max((len(s) for s in re.split(r"[。！？；]", text) if s.strip()),
-                     default=0)
+        long_s = max((len(s) for s in _sents(text)
+                      if s.count("、") < 3), default=0)
         if long_s > 60:
             out.append(Finding(loc, "W9", f"单句 {long_s} 字（> 60）",
                                "拆句，一句一个概念", SEV_HINT))

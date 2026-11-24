@@ -3,7 +3,7 @@ name: enterprise-doc-format
 description: "When the user writes, restyles, or reviews a business document (annual report, board paper, proposal, white paper, memo, SOP, contract summary, resume) and expects it to read well and look professionally typeset — especially Chinese or mixed CJK/Latin Word/PowerPoint/Excel/PDF output. Also use when asked to 'check formatting', '审一下排版', '这份文档哪里别扭', '按规范检查文档', '这张表怎么这么难看', or to fix inconsistent fonts/line spacing/table borders/gridlines/number formats. Covers prose rules (voice, banned words, units, numbers, headings, AI tells), typographic rules (type scale, CJK leading, tracking, measure, table rules, page setup), and comes with scripts that audit .docx, .xlsx and .pptx automatically."
 description_zh: "企业办公文件（年报/董事会材料/方案/白皮书/汇报/制度）的书写规范与排印规范检查与重排；可用脚本自动审 .docx 并一键套用公司版式。"
 description_en: "Write, audit, and restyle business documents: prose rules plus CJK-aware typography, with scripts that check and reformat .docx files."
-version: 1.2.0
+version: 1.2.1
 allowed-tools: Bash, Read, Write, Edit
 metadata:
   emoji: "📄"

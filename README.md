@@ -141,6 +141,8 @@ cp -r enterprise-doc-format ~/.agents/skills/
 
 ## 版本
 
+`1.2.1` — 新增 T17（图片段落用固定行距 → 导出 PDF 图变空白）；`references/office-params.md` 补齐四个渲染级坑（图片段落行距、`tcBorders` 顺序、白色边框盖参考线、列宽三处设全）。
+
 `1.2.0` — 新增 PowerPoint 审计（`audit_pptx.py`，P1–P15）：一页一主张、正文 ≥16pt、念稿、图表网格线、alt 文本、画幅；evals 增加 pptx fixture，CI 三格式全跑。
 
 `1.1.0` — 新增 Excel 审计（`audit_xlsx.py`，X1–X15），书写规则抽成 `text_rules.py` 供多个审计器共用；evals 增加 xlsx fixture。

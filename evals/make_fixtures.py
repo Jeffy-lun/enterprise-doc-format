@@ -457,6 +457,24 @@ def make_good_pptx(path):
     prs.save(path)
 
 
+def make_bad_img(path):
+    """图片段落用了固定行距：Word 里正常，导出 PDF 图变空白（T17）。"""
+    doc = Document()
+    page_margins(doc)
+    style = doc.styles["Normal"]
+    style.font.size = Pt(11.5)
+    style.font.name = LATIN
+    style.element.rPr.rFonts.set(qn("w:eastAsia"), BODY_CN)
+    style.paragraph_format.line_spacing = Pt(21)
+    style.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+
+    para(doc, "下图是一份排好的封面。", lead=21)
+    p = doc.add_paragraph()          # 故意继承 21 磅固定行距
+    p.add_run().add_picture(_pixel(), width=Cm(6))
+    para(doc, "图 1　封面示意", size=9, lead=14)
+    doc.save(path)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     make_bad(os.path.join(OUT, "bad.docx"))
@@ -465,4 +483,5 @@ if __name__ == "__main__":
     make_good_xlsx(os.path.join(OUT, "good.xlsx"))
     make_bad_pptx(os.path.join(OUT, "bad.pptx"))
     make_good_pptx(os.path.join(OUT, "good.pptx"))
+    make_bad_img(os.path.join(OUT, "bad-img.docx"))
     print("fixtures:", OUT)

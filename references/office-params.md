@@ -23,6 +23,39 @@
 2. **OOXML 子元素有顺序**：`w:spacing` 必须排在 `w:sz` **之前**，`w:tblBorders` 必须在 `w:tblLayout` **之前**，`w:pBdr` 必须在 `w:spacing` **之前**。顺序错了 Word/LibreOffice **静默忽略**——字距不生效、表格线关不掉、页脚框线去不掉，都是这个原因。写 OOXML 时用「按 schema 顺序插入」的辅助函数，不要直接 `append`。
 3. **内置样式带私货**：`Title`、`Heading 1`、`Quote` 样式自带 Calibri / Times 斜体 / 蓝色。要改样式本身（`doc.styles['Heading 1'].font...` + `rFonts.eastAsia`），不能只改段落 run，否则导出 PDF 会暴露无关字体。
 
+### 插图与表格的四个渲染级坑（都由真实文档踩出来）
+
+**坑一：含图片的段落不能用固定行距，否则图被裁成一行高。**
+症状：Word 里图是好的，导出 PDF 后图片位置一片空白，图注却正常。原因：正文样式是 `Pt(21) + EXACTLY`，图片段落继承了它，渲染器把 10cm 高的图裁到 21 磅，看着就是空白。修法：
+
+```python
+pf.line_spacing = None                       # 不要沿用 Normal 的固定值
+pf.line_spacing_rule = WD_LINE_SPACING.SINGLE
+p.add_run().add_picture(path, width=Cm(6.9))
+```
+
+图注段落可以继续用固定行距（那是文字）。同一份文档里「正文固定行距 + 插图」必然碰撞，写完图必须导一次 PDF 看。
+
+**坑二：`tcBorders` 子元素顺序错了，整条边框设置被丢弃。**
+schema 顺序是 `top → left → bottom → right`（不是 top/left/right/bottom）。写错时渲染器**忽略整个 `tcBorders`**，表格回退成默认网格——你会以为「设了 nil 怎么还有线」。
+
+**坑三：LibreOffice 会给「无边框表格」画浅灰参考线。**
+`tblBorders` 全 `nil` 也会画，导出 PDF 里就是一层灰格子，正好破坏三线表。两个办法合用：
+
+- 四边给**白色细线**（`val=single, sz=2, color=FFFFFF`）盖掉参考线，视觉等同无边框；
+- 需要显示的横线改用**单元格段落的底边框**（`w:pBdr/w:bottom`）画，位置与粗细完全可控，渲染器不能覆盖。
+
+**坑四：列宽总和必须等于版心，且要在三个地方设。**
+A4 左右各 3.0cm 时版心 15cm。列宽总和 15.2cm 就会出现列错位、三线断裂。三处都要给：
+
+```python
+tblW = sum(widths) / 2.54 * 1440        # 表级总宽，单位 twips
+table.columns[i].width = Cm(widths[i])  # 列
+cell.width = Cm(widths[i])              # 单元格
+```
+
+只设 `cell.width` 在 `tblLayout=fixed` 下不生效，列宽会按 `tblGrid` 走。
+
 ### 数字
 表格数字右对齐 + 等宽数字；金额 `#,##0`；比率 `0.0%`；变动 `+0.0%;-0.0%`，百分点用 `+0.0" pt"` 并把值乘 100。
 

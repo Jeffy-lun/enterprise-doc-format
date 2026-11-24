@@ -322,6 +322,43 @@ def check_typography(d, out):
         out.append(Finding("footer", "T13", "页脚没有页码", "加「第 x 页 / 共 y 页」",
                            SEV_HINT))
 
+    # T17 图片段落用了固定行距：图会被裁成一行高，导出 PDF 变空白
+    def _eff_rule(par):
+        """行距规则要沿样式链找：只查段落级会漏掉从 Normal 继承固定行距的情况。"""
+        if par.paragraph_format.line_spacing is not None:
+            return par.paragraph_format.line_spacing_rule
+        try:
+            st = par.style
+            while st is not None:
+                if st.paragraph_format.line_spacing is not None:
+                    return st.paragraph_format.line_spacing_rule
+                st = st.base_style
+        except Exception:
+            pass
+        return None
+
+    clipped = []
+
+    def _has_image(par):
+        return bool(par._p.findall(".//" + W + "drawing")
+                    or par._p.findall(".//" + W + "pict"))
+
+    fixed_rules = (WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST)
+    for loc, text, style, p in d.paragraphs:
+        if p is not None and _has_image(p) and _eff_rule(p) in fixed_rules:
+            clipped.append(loc)
+    for ti, table in enumerate(d.doc.tables):
+        for ri, row in enumerate(table.rows):
+            for ci, cell in enumerate(row.cells):
+                for p in cell.paragraphs:
+                    if _has_image(p) and _eff_rule(p) in fixed_rules:
+                        clipped.append(f"t{ti}r{ri}c{ci}")
+    if clipped:
+        out.append(Finding(clipped[0], "T17",
+                           f"{len(clipped)} 个含图片的段落用了固定行距",
+                           "改单倍行距（line_spacing=None + SINGLE），"
+                           "否则导出 PDF 图会变空白", SEV_CRITICAL))
+
 
 # ── 书写检查（转交 text_rules） ─────────────────────────────────
 def check_writing(d, out):
